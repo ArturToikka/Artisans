@@ -1,0 +1,140 @@
+﻿@page "/mybookings"
+@inject UserManager<ApplicationUser> _UserManager
+@inject RoleManager<IdentityRole> _RoleManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAppointmentService AppointmentService;
+@inject UserManager<ApplicationUser> UserManager;
+@inject IAppUserService UserService;
+@inject IProfileOperationService ProfileOperationservice;
+@inject IOperationService OpService;
+@inject Core.Helpers.TimeHelpers th;
+
+<AuthorizeView>
+    <Authorized>
+        <h3>Bookings</h3>
+
+        @if (show)
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Artisan</th>
+                        <th>Operations</th>
+                        <th>Date</th>
+                        <th>Duration</th>
+                        <th>Address</th>
+                        <th>Confirmed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (appointments != null)
+                    {
+                        @foreach (var a in appointments)
+                        {
+                            <tr>
+
+                                <td>@artisans.Find(ar => ar.Id == a.ArtisanId).Email</td>
+                                <td>
+                                    @foreach (var o in appointmentOps)
+                                    {
+                                        if (o.AppointmentId == a.Id)
+                                        {
+                                            @operations.Find(x => x.Id == o.ProfileOperation.OperationId).Name
+                                            <br />
+                                        }
+                                    }
+                                </td>
+                                <td>@Convert.ToDateTime(a.Date).ToString("dd-MMMM-yy HH:mm")</td>
+                                <td>@(th.HoursAndMinutesString(a.EstimatedDuration))</td>
+                                <td>@a.Place</td>
+                                <td>
+                                    @if (!a.Accepted)
+                                    {
+                                        <span class="oi oi-x" />
+                                    }
+                                    @if (a.Accepted)
+                                    {
+                                        <span class="oi oi-check" />
+                                    }
+                                </td> 
+                                <td>
+                                    <button class="alert-danger" @onclick="(()=>CancelBooking(a.Id))">Cancel</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+
+                </tbody>
+            </table>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <p>You're not logged in.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    string userId;
+    List<Appointment> appointments = new List<Appointment>();
+    List<AppointmentOperations> appointmentOps = new List<AppointmentOperations>();
+    List<ApplicationUser> artisans = new List<ApplicationUser>();
+    List<ProfileOperation> profOps = new List<ProfileOperation>();
+    List<Operation> operations = new List<Operation>();
+
+
+    string message;
+    bool show = false;
+
+    private async Task CancelBooking(string appointmentId)
+    {
+        await AppointmentService.DeleteAppointment(appointmentId);
+        appointments = await AppointmentService.GetUserAppointments(userId);
+        appointments.Sort((x, y) => DateTime.Compare(x.Date, y.Date));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetUser();
+        if (userId != null)
+        {
+            appointments = await AppointmentService.GetUserAppointments(userId);
+            appointmentOps = await AppointmentService.GetCustomerAppointmentOperations(userId);
+            appointments.Sort((x, y) => DateTime.Compare(x.Date, y.Date));
+
+            foreach (Appointment a in appointments)
+            {
+                artisans.Add(await UserService.GetAppUserByIdAsync(a.ArtisanId));
+                //if (a.Date < DateTime.Now)
+                //{
+                //    appointments.Remove(a);
+                //}
+            }
+            foreach (ApplicationUser a in artisans)
+            {
+                profOps.AddRange(await ProfileOperationservice.GetProfileOperations(a.Id));
+            }
+            foreach (ProfileOperation po in profOps)
+            {
+                operations.Add(await OpService.GetOperationByIdAsync(po.OperationId));
+            }
+            ToggleShow();
+        }
+    }
+
+    private async Task GetUser()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var _user = authState.User;
+        if (_user.Identity.IsAuthenticated)
+        {
+            var currentUser = await UserManager.GetUserAsync(_user);
+            userId = currentUser.Id;
+        }
+    }
+
+    public void ToggleShow()
+    {
+        show = !show;
+    }
+
+}

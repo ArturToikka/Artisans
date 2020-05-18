@@ -1,0 +1,31 @@
+﻿@page "/profile/{id}"
+@inject IAppUserService UserService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager;
+
+<h3>Profile</h3>
+<br />
+
+@code {
+    [Parameter]
+    public string id { get; set; }
+    public ApplicationUser profile { get; set; }
+    string ID;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        profile = await UserService.GetAppUserByIdAsync(id);
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity.IsAuthenticated)
+        {
+            var currentUser = await UserManager.GetUserAsync(user);
+
+            ID = currentUser.Id;
+        }
+    }
+
+}

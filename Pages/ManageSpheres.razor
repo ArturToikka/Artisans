@@ -1,0 +1,102 @@
+﻿@page "/spheres"
+@inject ISphereService SphereService
+
+<AuthorizeView Roles="Admin">
+    <Authorized Context="Auth">
+
+        <h3>Manage spheres</h3>
+        <br />
+        <button class="btn btn-success" @onclick="AddNewSphere">Add Sphere</button>
+        <br />
+
+        @if(ShowFields)
+        {
+            <br />
+            <EditForm Context="Form" Model="@_sphere" OnValidSubmit="@AddSphere">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <InputText id="Name" @bind-Value="@_sphere.Name" />
+
+                <button type="submit">Submit</button>
+                <button type="reset" @onclick="@HideFields">Cancel</button>
+            </EditForm>
+            <br />
+        }
+
+
+        @if(SpheresList != null)
+        {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Sphere</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in SpheresList)
+                {
+                    <tr>
+                        <td>@s.Id</td>
+                        <td>@s.Name</td>
+                        <td><button class="alert-danger" @onclick="(() => DeleteSphere(s.Id))">Delete</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        }
+
+    </Authorized>
+    <NotAuthorized>
+        <p>You shall not pass.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private async Task DeleteSphere(string id)
+    {
+        await SphereService.DeleteSphereAsync(id);
+        await GetSpheres();
+    }
+
+    private async Task AddSphere()
+    {
+        await SphereService.InsertSphereAsync(_sphere);
+        HideFields();
+        await GetSpheres();
+    }
+
+    async Task EditSphere(Sphere _sphere)
+    {
+        sphere = _sphere;
+        var s = await SphereService.GetSphereByIdAsync(sphere.Id);
+        ShowFields = true;
+    }
+
+    void AddNewSphere()
+    {
+        _sphere = new Sphere();
+        _sphere.Id = Guid.NewGuid().ToString();
+        ShowFields = true;
+
+    }
+    void HideFields()
+    {
+        ShowFields = false;
+    }
+
+    public async Task GetSpheres()
+    {
+        SpheresList = await SphereService.GetSpheresAsync();
+    }
+
+    Sphere sphere = new Sphere();
+    Sphere _sphere { get; set; }
+    bool ShowFields = false;
+    List<Sphere> SpheresList = new List<Sphere>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetSpheres();
+    }
+}

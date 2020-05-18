@@ -1,0 +1,166 @@
+﻿@inject IAppointmentService AppointmentService
+
+@if (!isPossibleToBook)
+{
+    <div class="alert-danger">
+        <p>Unavailable times:</p>
+        <ul>
+            @foreach (string t in bookedTimes)
+            {
+                <li>@t</li>
+            }
+        </ul>
+    </div>
+}
+
+<label for="meeting-time">Choose a time for your appointment:</label>
+
+<div class="row" style="padding-top:10px">
+
+    <input type="date" id="meeting-time"
+           name="meeting-time" value="@date" @onchange="UpdateDate">
+
+    <div class="col-2">
+        <select class="form-control" @onchange="Hours">
+            <option value="@hours">@hours</option>
+            @for (int h = 1; h <= 23; h++)
+            {
+                <option value="@h">@h</option>
+            }
+        </select>
+    </div>
+    <label>Hours</label>
+    <div class="col-2">
+        <select class="form-control" @onchange="Minutes">
+            <option value="@minutes">@minutes</option>
+            @for (int m = 0; m <= 55; m += 5)
+            {
+                <option value="@m">@m</option>
+            }
+        </select>
+    </div>
+    <label>Minutes</label>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<DateTime> appointmentTime { get; set; }
+    [Parameter]
+    public string artisanId { get; set; }
+    [Parameter]
+    public int duration { get; set; }
+    [Parameter]
+    public EventCallback<bool> canBook { get; set; }
+    bool isPossibleToBook = true;
+    public string date = Convert.ToDateTime(DateTime.Now).ToString("yyyy-MM-dd");
+    List<string> bookedTimes = new List<string>();
+    int hours;
+    int minutes;
+    DateTime aT;
+    List<Appointment> appointments = new List<Appointment>();
+
+
+    private void IfPossibleToBook()
+    {
+        isPossibleToBook = true;
+        CombineAppointmentTime();
+        var endB = aT.AddMinutes(duration);
+        if(aT > DateTime.Now)
+        {
+            foreach (Appointment a in appointments)
+            {
+                var startA = a.Date;
+                var endA = a.Date.AddMinutes(a.EstimatedDuration);
+                if (aT > startA && aT < endA || endB > startA && endB < endA)
+                {
+                    isPossibleToBook = false;
+                    ReturnIfIsPossibleToBook();
+                }
+            }
+            if (isPossibleToBook)
+            {
+                ReturnAppointmentTime();
+                ReturnIfIsPossibleToBook();
+            }
+        }
+        else
+        {
+            isPossibleToBook = false;
+        }
+    }
+
+    private Task ReturnAppointmentTime()
+    {
+        return appointmentTime.InvokeAsync(aT);
+    }
+    private Task ReturnIfIsPossibleToBook()
+    {
+        return canBook.InvokeAsync(isPossibleToBook);
+    }
+
+    async void UpdateDate(ChangeEventArgs e)
+    {
+        date = e.Value.ToString();
+        await GetBookedTimesList(artisanId);
+        IfPossibleToBook();
+        StateHasChanged();
+    }
+
+    void Hours(ChangeEventArgs e)
+    {
+        hours = Convert.ToInt32(e.Value.ToString());
+        IfPossibleToBook();
+        StateHasChanged();
+    }
+
+    void Minutes(ChangeEventArgs e)
+    {
+        minutes = Convert.ToInt32(e.Value.ToString());
+        IfPossibleToBook();
+        StateHasChanged();
+    }
+
+    private void CombineAppointmentTime()
+    {
+        string at = $"{date} {hours}:{minutes}";
+        aT = Convert.ToDateTime(at);
+    }
+
+    private async Task GetBookedTimesList(string artisanId)
+    {
+        bookedTimes.Clear();
+        appointments.Clear();
+        DateTime d = Convert.ToDateTime(date);
+        HoursAndMinutes(d);
+        appointments = await AppointmentService.GetArtisanAppointmetsForADay(d, artisanId);
+
+        if (appointments != null)
+        {
+            foreach (Appointment a in appointments)
+            {
+                var start = a.Date.ToString("HH:mm");
+                var end = a.Date.AddMinutes(a.EstimatedDuration).ToString("HH:mm");
+                bookedTimes.Add($"From {start} To {end}");
+            }
+        }
+    }
+
+    private int Round(decimal source, decimal modulus)
+    {
+        return Convert.ToInt32((Math.Round(source / modulus) * modulus));
+    }
+
+    private void HoursAndMinutes(DateTime d)
+    {
+        hours = Convert.ToInt32(d.ToString("HH"));
+        var m = Round(d.Minute, 5);
+        if (m == 60)
+        {
+            minutes = 0;
+        }
+        else
+        {
+            minutes = m;
+        }
+    }
+}

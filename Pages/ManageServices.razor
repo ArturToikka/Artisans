@@ -1,0 +1,232 @@
+﻿@page "/services"
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager;
+@inject IAppUserService UserService;
+@inject IProfileOperationService ProfOpService;
+@inject IOperationService OpService;
+@inject ISphereService SpService;
+@inject Core.Helpers.TimeHelpers th;
+
+<h3>Manage services</h3>
+
+<AuthorizeView Roles="Artisan">
+    <Authorized Context="Auth">
+        @if (userId != null)
+        {
+            <SelectSphereAndOperation _SphereChanged="SphereHandler" _OperationChanged="OperationHandler" Loaded="GetListOfProfileOperations" />
+        }
+
+        @if (operation != null)
+        {
+            <EditForm Model="@profileOperation" OnValidSubmit="@AddOrUpdate">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <p>Sphere: @operation.Sphere.Name</p>
+                <p>Operation: @operation.Name</p>
+
+                <p>
+                    <label>Price</label><br />
+                    <InputNumber id="price" @bind-Value="profileOperation.Price" />
+                </p>
+                <p>
+                    <div class="row" style="padding-top:10px">
+                        <div class="col-2">
+                            <select class="form-control" @onchange="Hours">
+                                <option value="@hours">@hours</option>
+                                @for (int h = 0; h <= 12; h++)
+                                {
+                                    <option value="@h">@h</option>
+                                }
+                            </select>
+                        </div>
+                        <label>Hours</label>
+                        <div class="col-2">
+                            <select class="form-control" @onchange="Minutes">
+                                <option value="@minutes">@minutes</option>
+                                @for (int m = 0; m <= 55; m += 5)
+                                {
+                                    <option value="@m">@m</option>
+                                }
+                            </select>
+                        </div>
+                        <label>Minutes</label>
+                    </div>
+                </p>
+
+                <p>
+                    <label>Comments</label><br />
+                    <InputTextArea id="comments" @bind-Value="profileOperation.Comments" />
+                </p>
+
+                <button type="submit">Submit</button>
+            </EditForm>
+        }
+
+        @if (spheres != null)
+        {
+            <table class="table">
+
+                @foreach (Sphere s in spheres)
+                {
+                    <thead>
+                        <tr>
+                            <th>@s.Name</th>
+                        </tr>
+                        <tr>
+                            <th>Operation</th>
+                            <th>Price</th>
+                            <th>Duration</th>
+                            <th>Comments</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (ProfileOperation o in profileOperations)
+                        {
+                            @if (o.Operation.Sphere == s)
+                            {
+                                <tr>
+                                    <td>@o.Operation.Name</td>
+                                    <td>@o.Price €</td>
+                                    <td>@(th.HoursAndMinutesString(o.Duration))</td>
+                                    <td>@o.Comments</td>
+                                    <td><button class="alert-info" @onclick="(() => EditOperation(o))">Edit</button></td>
+                                    <td><button class="alert-danger" @onclick="(() => RemoveOperation(o.OperationId))">Remove</button></td>
+                                </tr>
+                            }
+
+                        }
+                    </tbody>
+                }
+            </table>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <p>You're not artisan</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+
+
+
+@code {
+    private string sphereId;
+    private string operationId;
+    private string userId;
+    private int hours;
+    private int minutes;
+    ApplicationUser user;
+    ProfileOperation profileOperation { get; set; } = new ProfileOperation();
+    Operation operation;
+    List<ProfileOperation> profileOperations = new List<ProfileOperation>();
+    List<Sphere> spheres = new List<Sphere>();
+
+    void Hours(ChangeEventArgs e)
+    {
+        hours = Convert.ToInt32(e.Value.ToString());
+        profileOperation.Duration = hours * 60 + minutes;
+    }
+    void Minutes(ChangeEventArgs e)
+    {
+        minutes = Convert.ToInt32(e.Value.ToString());
+        profileOperation.Duration = minutes + hours * 60;
+    }
+
+    void SphereHandler(string sId)
+    {
+        operation = null;
+        sphereId = sId;
+        StateHasChanged();
+    }
+    async void OperationHandler(string oId)
+    {
+        operationId = oId;
+        var op = await ProfOpService.GetProfileOperationById(userId, oId);
+        operation = await OpService.GetOperationByIdAsync(operationId);
+        if (op != null)
+        {
+            profileOperation = op;
+            int m = op.Duration;
+            hours = Math.DivRem(m, 60, out minutes);
+        }
+        else
+        {
+            profileOperation = new ProfileOperation();
+            hours = minutes = 0;
+        }
+
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var _user = authState.User;
+        user = await UserManager.GetUserAsync(_user);
+
+        if (_user.Identity.IsAuthenticated)
+        {
+            var currentUser = await UserManager.GetUserAsync(_user);
+
+            string ID = currentUser.Id;
+
+            user = await UserService.GetAppUserByIdAsync(ID);
+            userId = user.Id;
+            operation = null;
+        }
+    }
+
+
+    private async void GetListOfProfileOperations(bool loaded)
+    {
+        if (loaded)
+        {
+            profileOperations = await ProfOpService.GetProfileOperations(userId);
+            if (profileOperations != null)
+            {
+                foreach (ProfileOperation po in profileOperations)
+                {
+                    var op = await OpService.GetOperationByIdAsync(po.OperationId);
+                    if (!spheres.Contains(op.Sphere))
+                        spheres.Add(op.Sphere);
+                }
+            }
+            StateHasChanged();
+        }
+    }
+
+
+    public async void AddOrUpdate()
+    {
+        if (profileOperation.ApplicationUserId == null)
+        {
+            await ProfOpService.AddOperationToProfile(userId, operationId, profileOperation);
+        }
+        else
+        {
+            await ProfOpService.UpdateProfileOperation(profileOperation);
+        }
+        profileOperation = new ProfileOperation();
+        GetListOfProfileOperations(true);
+        operation = null;
+        StateHasChanged();
+    }
+
+    private async void RemoveOperation(string oId)
+    {
+        await ProfOpService.RemoveOperationFromProfile(oId, userId);
+        GetListOfProfileOperations(true);
+        operation = null;
+        StateHasChanged();
+    }
+
+    private async void EditOperation(ProfileOperation o)
+    {
+        profileOperation = o;
+        int m = o.Duration;
+        hours = Math.DivRem(m, 60, out minutes);
+        operation = await OpService.GetOperationByIdAsync(o.OperationId);
+        StateHasChanged();
+    }
+
+}

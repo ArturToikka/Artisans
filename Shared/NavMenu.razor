@@ -1,0 +1,71 @@
+﻿<div class="top-row pl-4 navbar navbar-dark">
+    <a class="navbar-brand" href="">Artisans</a>
+    <button class="navbar-toggler" @onclick="ToggleNavMenu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <ul class="nav flex-column">
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="search">
+                <span class="oi oi-magnifying-glass" aria-hidden="true"></span> Search
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="oi oi-home" aria-hidden="true"></span> Home
+            </NavLink>
+        </li>
+        <AuthorizeView Roles="Admin">
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="administration">
+                    <span class="oi oi-people" aria-hidden="true"></span> Administration
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="spheres">
+                    <span class="oi oi-document" aria-hidden="true"></span> Spheres
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="operations">
+                    <span class="oi oi-document" aria-hidden="true"></span> Operations
+                </NavLink>
+            </li>
+        </AuthorizeView>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="myprofile">
+                <span class="oi oi-person" aria-hidden="true"></span> My profile
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="mybookings">
+                <span class="oi oi-calendar" aria-hidden="true"></span> My bookings
+            </NavLink>
+        </li>
+        <AuthorizeView Roles="Artisan">
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="bookingsToMe">
+                    <span class="oi oi-check" aria-hidden="true"></span> Bookings to me
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="services">
+                    <span class="oi oi-check" aria-hidden="true"></span> My services
+                </NavLink>
+            </li>
+        </AuthorizeView>
+    </ul>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

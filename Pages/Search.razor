@@ -1,0 +1,100 @@
+﻿@page "/search"
+@inject ISphereService SphereService;
+@inject IOperationService OperationService;
+@inject IAppUserService UserService;
+@inject IProfileOperationService pOS;
+@inject NavigationManager NavMan;
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject Core.Helpers.TimeHelpers th;
+<AuthorizeView>
+    <Authorized>
+        <h3>Search</h3>
+
+        <hr />
+
+        <SelectSphereAndOperation _SphereChanged="SphereHandler" _OperationChanged="OperationHandler" />
+
+        @if (artisans != null && operationId != "0")
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Artisan</th>
+                        <th>Operation</th>
+                        <th>Comment</th>
+                        <th>Price</th>
+                        <th>Duration</th>
+                        <th>Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (ops.Count != 0)
+                    {
+                        @foreach (var a in artisans)
+                        {
+                    <tr>
+                        <td>@a.Email</td>
+                        <td>@ops.Find(i => i.ApplicationUserId == a.Id && i.OperationId == operationId).Operation.Name</td>
+                        <td>@ops.Find(i => i.ApplicationUserId == a.Id && i.OperationId == operationId).Comments</td>
+                        <td>@ops.Find(i => i.ApplicationUserId == a.Id && i.OperationId == operationId).Price €</td>
+                        <td>
+                            @(th.HoursAndMinutesString(
+                                    ops.Find(i => i.ApplicationUserId == a.Id && i.OperationId == operationId).Duration))
+                        </td>
+                        <td>@a.Address</td>
+                        <td><button class="border-success" @onclick="(() => GoToBooking(a.Id))">Book</button></td>
+
+                    </tr>
+                        }
+                    }
+
+                </tbody>
+            </table>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <p>You're not logged in.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+
+@code{
+
+    void SphereHandler(string sId)
+    {
+        sphereId = sId;
+        artisans.Clear();
+    }
+    async void OperationHandler(string oId)
+    {
+        operationId = oId;
+        await GetOperationArtisans();
+        if (artisans.Count != 0)
+        {
+            ops = await pOS.GetProfilesOperationsForProfiles(artisans);
+        }
+        StateHasChanged();
+    }
+
+    string sphereId { get; set; }
+    string operationId { get; set; } = "0";
+
+    List<ApplicationUser> artisans = new List<ApplicationUser>();
+    List<ProfileOperation> ops = new List<ProfileOperation>();
+
+    private async void GoToBooking(string aId)
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var _user = authState.User;
+        var currentUser = await UserManager.GetUserAsync(_user);
+        var userId = currentUser.Id;
+        NavMan.NavigateTo($"book/{userId}/{aId}/{operationId}");
+    }
+
+    private async Task GetOperationArtisans()
+    {
+        artisans.Clear();
+        artisans = await UserService.GetUsersOfOperation(operationId);
+    }
+}

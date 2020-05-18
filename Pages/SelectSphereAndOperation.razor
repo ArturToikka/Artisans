@@ -1,0 +1,106 @@
+﻿@inject ISphereService SphereService;
+@inject IOperationService OperationService;
+
+@if (spheresList == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <label for="Sphere" class="control-label">Sphere</label>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="Operation" class="control-label">Operation</label>
+        </div>
+    </div>
+    <div class="row" style="padding-top:10px">
+        <div class="col-md-4">
+
+            <select class="form-control" @onchange="SphereChanged">
+                <option value="">-- Select sphere --</option>
+                @foreach (var sphere in spheresList)
+                {
+                    <option value="@sphere.Id">@sphere.Name</option>
+
+                }
+            </select>
+        </div>
+
+
+        <div class="col-md-4">
+            <select class="form-control" @onchange="OperationChanged">
+                <option value="0">-- Select operation --</option>
+                @if (operationsList != null)
+                {
+                    @foreach (var operation in operationsList)
+                    {
+                        <option value="@operation.Id">@operation.Name</option>
+
+                    }
+                }
+            </select>
+        </div>
+    </div>
+    <br />
+}
+
+@code {
+    [Parameter]
+    public string sphereId { get; set; }
+    [Parameter]
+    public string operationId { get; set; }
+    [Parameter]
+    public bool _loaded { get; set; } = false;
+
+    [Parameter]
+    public EventCallback<string> _SphereChanged { get; set; }
+    [Parameter]
+    public EventCallback<string> _OperationChanged { get; set; }
+    [Parameter]
+    public EventCallback<bool> Loaded { get; set; }
+
+    List<Sphere> spheresList = new List<Sphere>();
+    List<Operation> operationsList = new List<Operation>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        spheresList = await SphereService.GetSpheresAsync();
+        if (spheresList != null)
+        {
+            await ReturnBool();
+        }
+
+    }
+
+    private Task ReturnBool()
+    {
+        _loaded = true;
+        return Loaded.InvokeAsync(_loaded);
+    }
+
+    protected void GetSphereOperations(string id)
+    {
+        operationsList = OperationService.GetOperationsBySphereId(id);
+    }
+
+    private Task SphereChanged(ChangeEventArgs sphereEvent)
+    {
+        operationsList.Clear();
+
+        sphereId = sphereEvent.Value.ToString();
+
+        if (sphereId != null)
+        {
+            GetSphereOperations(sphereId);
+
+        }
+        return _SphereChanged.InvokeAsync(sphereId);
+    }
+    private Task OperationChanged(ChangeEventArgs operationEvent)
+    {
+        operationId = operationEvent.Value.ToString();
+        return _OperationChanged.InvokeAsync(operationId);
+    }
+}

@@ -1,0 +1,149 @@
+﻿@page "/myprofile"
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject IAppUserService UserService
+@inject RoleManager<IdentityRole> RM
+@inject IProfileOperationService POService
+
+<AuthorizeView>
+    <Authorized Context="Auth">
+        @if (user != null)
+        {
+        <EditForm Model="@user" OnValidSubmit="@UpdateUser">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            @*<p>
+                <label>
+                    Profile name:<br />
+                    <InputText @bind-Value="user.ProfileName" />
+                </label>
+            </p>*@
+            <p>
+                <label>
+                    First name:<br />
+                    <InputText @bind-Value="user.FirstName" />
+                </label>
+            </p>
+            <p>
+                <label>
+                    Last name:<br />
+                    <InputText @bind-Value="user.LastName" />
+                </label>
+            </p>
+            <p>
+                <label>
+                    Email:<br />
+                    <InputText @bind-Value="user.ContactEmail" />
+                </label>
+            </p>
+            <p>
+                <label>
+                    Phone number :<br />
+                    <InputText @bind-Value="user.ContactPhoneNumber" />
+                </label>
+            </p>
+            <p>
+                <label>
+                    Service address:<br />
+                    <InputText @bind-Value="user.Address" />
+                </label>
+            </p>
+            <p>
+                <button class="btn-primary" type="submit">Save</button>
+            </p>
+        </EditForm>
+        }
+        <br />
+        @if (loaded)
+        {
+            <div class="alert">
+                <p>Artisan profile</p>
+                <label class="switch">
+                    <input type="checkbox" value="@isArtisan"
+                           checked="@(isArtisan.Equals(true))" @onchange="ChangeRole">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        }
+
+    </Authorized>
+    <NotAuthorized>
+        <p>You're not logged in.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter]
+    public ApplicationUser user { get; set; }
+    string Message = "";
+    string ARTISAN_ROLE = "Artisan";
+    bool isArtisan = false;
+    bool loaded = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user1 = authState.User;
+
+        if (user1.Identity.IsAuthenticated)
+        {
+            var currentUser = await UserManager.GetUserAsync(user1);
+
+            string ID = currentUser.Id;
+
+            user = await UserService.GetAppUserByIdAsync(ID);
+
+            if (user1.IsInRole(ARTISAN_ROLE))
+            {
+                isArtisan = true;
+            }
+            loaded = true;
+        }
+    }
+    private async void UpdateUser()
+    {
+        await UserService.UpdateAppUserAsync(user);
+        StateHasChanged();
+    }
+    private async void ChangeRole()
+    {
+        await CheckIfThereIsRole();
+        if (!isArtisan)
+        {
+
+            var UserResult = await UserManager.IsInRoleAsync(user, ARTISAN_ROLE);
+            if (!UserResult)
+            {
+                await UserManager.AddToRoleAsync(user, ARTISAN_ROLE);
+                isArtisan = true;
+            }
+
+        }
+        else
+        {
+            var UserResult = await UserManager.IsInRoleAsync(user, ARTISAN_ROLE);
+            if (UserResult)
+            {
+                await UserManager.RemoveFromRoleAsync(user, ARTISAN_ROLE);
+                List <ProfileOperation> ops = new List<ProfileOperation>();
+                ops = await POService.GetProfileOperations(user.Id);
+                foreach(ProfileOperation o in ops)
+                {
+                   await POService.RemoveOperationFromProfile(o.OperationId, user.Id);
+                }
+                isArtisan = false;
+            }
+
+            StateHasChanged();
+        }
+
+    }
+    private async Task CheckIfThereIsRole()
+    {
+        var RoleResult = await RM.FindByNameAsync(ARTISAN_ROLE);
+        if (RoleResult == null)
+        {
+            await RM.CreateAsync(new IdentityRole(ARTISAN_ROLE));
+        }
+    }
+}

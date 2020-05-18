@@ -1,0 +1,152 @@
+﻿@page "/operations"
+@inject ISphereService SphereService;
+@inject IOperationService OperationService;
+
+<AuthorizeView Roles="Admin">
+    <Authorized Context="Auth">
+
+        <h3>Manage operations</h3>
+        <br />
+
+        <hr />
+
+        @if (SpheresList == null)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="Sphere" class="control-label">Sphere</label>
+                </div>
+            </div>
+            <div class="row" style="padding-top:10px">
+                <div class="col-md-4">
+
+                    <select class="form-control" @onchange="SphereChanged">
+                        <option value="0">-- Select sphere --</option>
+                        @foreach (var sphere in SpheresList)
+                        {
+                            <option value="@sphere.Id">@sphere.Name</option>
+
+                        }
+                    </select>
+                </div>
+                <button class="btn btn-success" @onclick="ShowFields">Add Operation</button>
+            </div>
+        }
+
+
+        <br />
+
+        @if (fields)
+        {
+            <br />
+            <EditForm Context="Form" Model="@_Operation" OnValidSubmit="@AddOperation">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <InputText id="Name" @bind-Value="@_Operation.Name" />
+
+                <button type="submit">Submit</button>
+                <button type="reset" @onclick="@HideFields">Cancel</button>
+            </EditForm>
+            <br />
+        }
+
+
+        @if (OperationsList != null)
+        {
+            @if (showTable)
+            {
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Id</th>
+                            <th>Operation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var o in OperationsList)
+                        {
+                            <tr>
+                                <td>@o.Id</td>
+                                <td>@o.Name</td>
+                                <td><button class="alert-danger" @onclick="(() => DeleteOperation(o.Id))">Delete</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        }
+
+
+    </Authorized>
+    <NotAuthorized>
+        <p>You shall not pass.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+
+    [Parameter]
+    public Operation _Operation { get; set; } = new Operation();
+    List<Sphere> SpheresList = new List<Sphere>();
+    List<Operation> OperationsList = new List<Operation>();
+    string sphereId;
+    public Sphere _sphere;
+    bool fields = false;
+    bool showTable = false;
+
+    private void SphereChanged(ChangeEventArgs sphereEvent)
+    {
+        sphereId = sphereEvent.Value.ToString();
+        GetSphereOperations();
+        HideFields();
+        showTable = (sphereEvent.Value.ToString() != "0") ? true : false;
+    }
+
+    private void GetSphereOperations()
+    {
+        OperationsList = OperationService.GetOperationsBySphereId(sphereId);
+    }
+
+    private async Task AddOperation()
+    {
+
+        await OperationService.InsertOperationAsync(_Operation);
+        HideFields();
+        GetSphereOperations();
+    }
+
+    async void ShowFields()
+    {
+        _Operation = new Operation();
+        _Operation.Id = Guid.NewGuid().ToString();
+        _Operation.SphereId = sphereId;
+        _Operation.Sphere = await SphereService.GetSphereByIdAsync(sphereId);
+        fields = true;
+    }
+
+    void HideFields()
+    {
+        fields = false;
+    }
+
+    private async Task DeleteOperation(string id)
+    {
+        await OperationService.DeleteOperationAsync(id);
+        GetSphereOperations();
+    }
+
+    public async Task GetSpheres()
+    {
+        SpheresList = await SphereService.GetSpheresAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetSpheres();
+    }
+
+}

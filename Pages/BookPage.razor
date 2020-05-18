@@ -1,0 +1,189 @@
+﻿@page "/book/{userId}/{artisanId}/{operationId}"
+@inject IAppUserService UserService;
+@inject IProfileOperationService ProfileOperationService;
+@inject IOperationService OperationService;
+@inject NavigationManager NavMan;
+@inject IAppointmentService AppointmentService;
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager;
+@inject Core.Helpers.TimeHelpers th;
+
+<h3>Book appointment</h3>
+
+@if (_appointment != null)
+{
+    <EditForm Model="@_appointment" OnValidSubmit="@Book">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="alert-info">
+            <p>To: @artisan.Email</p>
+            <p>At: @artisan.Address</p>
+        </div>
+
+        @*<InputDate type="date" @bind-Value="@_appointment.Date"></InputDate> <br />*@
+        <AvailableTimes artisanId="@artisanId" duration="duration" appointmentTime="SetAppointmentTime" canBook="ShowBookButton" />
+
+        <br />
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Operation</th>
+                    <th>Price</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (opsToAppointment != null)
+                {
+                    @foreach (var o in opsToAppointment)
+                    {
+                        <tr>
+                            <td>@o.Operation.Name</td>
+                            <td>@o.Price</td>
+                            <td>@(th.HoursAndMinutesString(o.Duration))</td>
+                            <td><button class="alert-danger" @onclick="(()=>RemoveOperation(o))">X</button></td>
+                        </tr>
+                    }
+                }
+
+            </tbody>
+            <thead>
+                <tr>
+                    <th>Total price</th>
+                    <th>Estimated duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>@price €</td>
+                    <td>@(th.HoursAndMinutesString(duration))</td>
+                </tr>
+            </tbody>
+        </table>
+
+        @if (profOps != null)
+        {
+            <div class="row" style="padding-top:10px">
+                <div class="col-md-4">
+                    <select class="form-control" @onchange="AddOperation">
+                        <option value="">-- Add operation --</option>
+                        @foreach (var o in profOps)
+                        {
+                            <option value="@o.OperationId">@o.Operation.Name</option>
+                        }
+                    </select>
+                </div>
+                @if (canBeBooked)
+                {
+                    <div class="col-md-1"><button class="btn-primary" type="submit">Book</button></div>
+                }
+
+                <div class="col-md-1"><button class="btn-secondary" type="reset" @onclick="(()=>BackToSearch())">Cancel</button></div>
+
+            </div>
+        }
+
+
+    </EditForm>
+}
+
+
+@code {
+    [Parameter]
+    public string userId { get; set; }
+    [Parameter]
+    public string artisanId { get; set; }
+    [Parameter]
+    public string operationId { get; set; }
+
+    Appointment _appointment { get; set; } = new Appointment();
+    ApplicationUser user;
+    ApplicationUser artisan;
+    Operation operation;
+    ProfileOperation profileOperation;
+    AppointmentOperations appointmentOperation;
+    List<ProfileOperation> profOps;
+    List<ProfileOperation> opsToAppointment { get; set; } = new List<ProfileOperation>();
+    double price;
+    int duration;
+    bool canBeBooked = false;
+
+    private void SetAppointmentTime(DateTime dt)
+    {
+        if (dt != null)
+        {
+            _appointment.Date = dt;
+            canBeBooked = true;
+        }
+        else
+            canBeBooked = false;
+    }
+
+    private void ShowBookButton(bool b)
+    {
+        if (b)
+        {
+            canBeBooked = true;
+        }
+        else
+            canBeBooked = false;
+    }
+
+    private async void AddOperation(ChangeEventArgs args)
+    {
+        if (args.Value.ToString() != "-- Add operation --")
+        {
+            var operation = await ProfileOperationService.GetProfileOperationById(artisanId, args.Value.ToString());
+            opsToAppointment.Add(operation);
+            profOps.Remove(operation);
+            price = opsToAppointment.Sum(p => p.Price);
+            duration = opsToAppointment.Sum(d => d.Duration);
+            StateHasChanged();
+        }
+    }
+    private void RemoveOperation(ProfileOperation o)
+    {
+        opsToAppointment.Remove(o);
+        profOps.Add(o);
+        price = opsToAppointment.Sum(p => p.Price);
+        duration = opsToAppointment.Sum(d => d.Duration);
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserService.GetAppUserByIdAsync(userId);
+        artisan = await UserService.GetAppUserByIdAsync(artisanId);
+        operation = await OperationService.GetOperationByIdAsync(operationId);
+        profileOperation = await ProfileOperationService.GetProfileOperationById(artisanId, operationId);
+        profOps = await ProfileOperationService.GetProfilesOperationsOfSphere(artisanId, operation.SphereId);
+        profOps.Remove(profileOperation);
+
+
+        opsToAppointment.Add(profileOperation);
+        price = opsToAppointment.Sum(p => p.Price);
+        duration = opsToAppointment.Sum(d => d.Duration);
+        _appointment.Date = DateTime.Now;
+
+    }
+
+    private async void Book()
+    {
+        _appointment.Id = Guid.NewGuid().ToString();
+        _appointment.Artisan = artisan;
+        _appointment.ArtisanId = artisanId;
+        _appointment.Customer = user;
+        _appointment.CustomerId = userId;
+        _appointment.Price = price;
+        _appointment.EstimatedDuration = duration;
+        _appointment.Place = artisan.Address;
+        await AppointmentService.CreateAppointmentAsync(_appointment, opsToAppointment);
+        NavMan.NavigateTo("mybookings");
+    }
+
+    private void BackToSearch()
+    {
+        NavMan.NavigateTo("search");
+    }
+}
