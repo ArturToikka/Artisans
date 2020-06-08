@@ -1,0 +1,9 @@
+C:\Users\artur\Desktop\Lõputöö\Artisans project\DAL\bin\Release\netcoreapp3.1\DAL.deps.json
+C:\Users\artur\Desktop\Lõputöö\Artisans project\DAL\bin\Release\netcoreapp3.1\DAL.dll
+C:\Users\artur\Desktop\Lõputöö\Artisans project\DAL\bin\Release\netcoreapp3.1\DAL.pdb
+C:\Users\artur\Desktop\Lõputöö\Artisans project\DAL\obj\Release\netcoreapp3.1\DAL.csprojAssemblyReference.cache
+C:\Users\artur\Desktop\Lõputöö\Artisans project\DAL\obj\Release\netcoreapp3.1\DAL.csproj.CoreCompileInputs.cache
+C:\Users\artur\Desktop\Lõputöö\Artisans project\DAL\obj\Release\netcoreapp3.1\DAL.AssemblyInfoInputs.cache
+C:\Users\artur\Desktop\Lõputöö\Artisans project\DAL\obj\Release\netcoreapp3.1\DAL.AssemblyInfo.cs
+C:\Users\artur\Desktop\Lõputöö\Artisans project\DAL\obj\Release\netcoreapp3.1\DAL.dll
+C:\Users\artur\Desktop\Lõputöö\Artisans project\DAL\obj\Release\netcoreapp3.1\DAL.pdb
